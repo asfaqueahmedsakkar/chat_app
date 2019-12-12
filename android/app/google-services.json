@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "237197212877",
+    "firebase_url": "https://chat-f5e51.firebaseio.com",
+    "project_id": "chat-f5e51",
+    "storage_bucket": "chat-f5e51.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:237197212877:android:346f5df4cff5a589797d84",
+        "android_client_info": {
+          "package_name": "com.speedcoders.chatapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "237197212877-s0o1i8vbckeucvqqfh4teu2b9v7qfpk0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.speedcoders.chatapp",
+            "certificate_hash": "10c24807ab297b44c2f5af17fc4fd17530f0d3e5"
+          }
+        },
+        {
+          "client_id": "237197212877-678qn4l8kdgo1s9kluct1t8ftmkd5320.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKfsjFsLXVnFjV1JpHWT7AFHp4bH3PE74"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "237197212877-678qn4l8kdgo1s9kluct1t8ftmkd5320.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
