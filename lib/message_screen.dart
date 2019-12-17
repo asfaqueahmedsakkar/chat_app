@@ -148,9 +148,11 @@ class MessageScreen extends StatelessWidget {
                       Message _message = Message.fromData(
                         data: documentSnapshot.data,
                       );
-                      Duration _messageTime = DateTime.now().difference(
-                        _message.messageTime.toDate(),
-                      );
+                      Duration _messageTime = _message.messageTime == null
+                          ? Duration(seconds: 30)
+                          : DateTime.now().difference(
+                              _message.messageTime.toDate(),
+                            );
 
                       return RawMaterialButton(
                         onPressed: () {
@@ -244,7 +246,6 @@ class MessageScreen extends StatelessWidget {
   }
 
   String _time(Duration messageTime) {
-    print(messageTime.toString());
     return messageTime.inDays < 365
         ? messageTime.inDays > 0
             ? "${messageTime.inDays.toString()} days"

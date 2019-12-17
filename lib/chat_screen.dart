@@ -3,7 +3,9 @@ import 'package:caht_app/app_color.dart';
 import 'package:caht_app/bloc/app_bloc.dart';
 import 'package:caht_app/bloc/bloc_provider.dart';
 import 'package:caht_app/bloc/chat_bloc.dart';
+import 'package:caht_app/model/message.dart';
 import 'package:caht_app/model/user.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -103,7 +105,26 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             child: Column(
               children: <Widget>[
-                Expanded(child: SizedBox()),
+                Expanded(
+                  child: StreamBuilder(
+                      stream: _chatBloc.stream,
+                      builder:
+                          (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+                        if (snapshot.data == null)
+                          return Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        return ListView.builder(
+                          reverse: true,
+                          itemCount: snapshot.data.documents.length,
+                          itemBuilder: (context, index) {
+                            Message message = Message.fromData(
+                                data: snapshot.data.documents[index]);
+                            return Text(message.message);
+                          },
+                        );
+                      }),
+                ),
                 Container(
                   padding: EdgeInsets.symmetric(
                     vertical: 8.0,
