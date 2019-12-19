@@ -368,91 +368,11 @@ class ChatBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18.0),
                   ),
             message.replyOf == null
-                ? bubbleWithNoReply()
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: fromMe
-                        ? CrossAxisAlignment.end
-                        : CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          SizedBox(
-                            width: !fromMe ? 16.0 : 0.0,
-                          ),
-                          Transform(
-                            transform: Matrix4.identity()..rotateY(pi),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              Icons.reply,
-                              size: 16.0,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(
-                            width: 4.0,
-                          ),
-                          Text(
-                            "${fromMe ? "You" : message.sender.name} replyed to ${(fromMe && message.replyOf.sender.uid == message.sender.uid) || (!fromMe && message.replyOf.sender.uid == message.receiver.uid) ? "You" : message.replyOf.sender.name}",
-                            style: TextStyle(
-                              fontSize: 10.0,
-                              fontWeight: FontWeight.w300,
-                            ),
-                          ),
-                          SizedBox(
-                            width: fromMe ? 16.0 : 0.0,
-                          ),
-                        ],
-                      ),
-                      Container(
-                        margin: EdgeInsets.symmetric(horizontal: 8.0),
-                        decoration: BoxDecoration(
-                          color: AppColor.deepBlack,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            bottomLeft: fromMe
-                                ? Radius.circular(20)
-                                : Radius.circular(0.0),
-                            topRight: Radius.circular(20),
-                            bottomRight: fromMe
-                                ? Radius.circular(0.0)
-                                : Radius.circular(20),
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: fromMe
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  left: 12.0,
-                                  right: 12.0,
-                                  top: 4.0,
-                                  bottom: 2.0),
-                              child: Text(
-                                message.replyOf.message,
-                                style: GoogleFonts.actor(fontSize: 16),
-                              ),
-                            ),
-                            Row(
-                              children: <Widget>[
-                                SizedBox(
-                                  width: fromMe ? 16 : 0,
-                                ),
-                                bubbleWithNoReply(),
-                                SizedBox(
-                                  width: !fromMe ? 16 : 0,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: bubbleWithNoReply(),
+                  )
+                : buildBubbleForReply(),
             !fromMe
                 ? SizedBox()
                 : ClipRRect(
@@ -469,7 +389,105 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Container bubbleWithNoReply() {
+  Widget buildBubbleForReply() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment:
+          fromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SizedBox(
+              width: !fromMe ? 16.0 : 0.0,
+            ),
+            Transform(
+              transform: Matrix4.identity()..rotateY(pi),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.reply,
+                size: 16.0,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(
+              width: 4.0,
+            ),
+            Text(
+              "${fromMe ? "You" : message.sender.name} replyed to ${(fromMe && message.replyOf.sender.uid == message.sender.uid) || (!fromMe && message.replyOf.sender.uid == message.receiver.uid) ? "You" : message.replyOf.sender.name}",
+              style: TextStyle(
+                fontSize: 10.0,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+            SizedBox(
+              width: fromMe ? 16.0 : 0.0,
+            ),
+          ],
+        ),
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: 8.0),
+          decoration: BoxDecoration(
+            color: AppColor.deepBlack,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              bottomLeft: fromMe ? Radius.circular(20) : Radius.circular(0.0),
+              topRight: Radius.circular(20),
+              bottomRight: fromMe ? Radius.circular(0.0) : Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment:
+                fromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.only(
+                    left: 12.0, right: 12.0, top: 4.0, bottom: 2.0),
+                child: Text(
+                  message.replyOf.message,
+                  style: GoogleFonts.actor(fontSize: 16),
+                ),
+              ),
+              Row(
+                children: <Widget>[
+                  SizedBox(
+                    width: fromMe ? 16 : 0,
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: fromMe ? AppColor.transparentWhite : Colors.red,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        bottomLeft:
+                            fromMe ? Radius.circular(20) : Radius.circular(0.0),
+                        topRight: Radius.circular(20),
+                        bottomRight:
+                            fromMe ? Radius.circular(0.0) : Radius.circular(20),
+                      ),
+                    ),
+                    child: Text(
+                      message.message,
+                      style: GoogleFonts.actor(fontSize: 18),
+                    ),
+                  ),
+                  SizedBox(
+                    width: !fromMe ? 16 : 0,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget bubbleWithNoReply() {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: 12,
