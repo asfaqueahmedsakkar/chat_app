@@ -1,10 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:caht_app/app_color.dart';
+import 'package:caht_app/bloc/app_bloc.dart';
 import 'package:caht_app/bloc/bloc_provider.dart';
 import 'package:caht_app/bloc/chat_list_bloc.dart';
 import 'package:caht_app/chat_screen.dart';
 import 'package:caht_app/contact_screen.dart';
-import 'package:caht_app/model/message.dart';
+import 'package:caht_app/model/chat_model.dart';
 import 'package:caht_app/model/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -145,7 +146,7 @@ class MessageScreen extends StatelessWidget {
                     itemBuilder: (context, index) {
                       DocumentSnapshot documentSnapshot =
                           snapShot.data.documents[index];
-                      Message _message = Message.fromData(
+                      ChatModel _message = ChatModel.fromData(
                         data: documentSnapshot.data,
                       );
                       Duration _messageTime = _message.messageTime == null
@@ -153,14 +154,17 @@ class MessageScreen extends StatelessWidget {
                           : DateTime.now().difference(
                               _message.messageTime.toDate(),
                             );
-
+                      User otherUser = _message.sender.uid ==
+                              BlocProvider.of<AppBloc>(context).user.uid
+                          ? _message.receiver
+                          : _message.sender;
                       return RawMaterialButton(
                         onPressed: () {
                           Navigator.push(
                               context,
                               MaterialPageRoute(
                                   builder: (context) => ChatScreen(
-                                        user: _message.receiver,
+                                        user: otherUser,
                                       )));
                         },
                         child: Container(
@@ -169,10 +173,10 @@ class MessageScreen extends StatelessWidget {
                           child: Row(
                             children: <Widget>[
                               Hero(
-                                tag: _message.receiver.uid,
+                                tag: otherUser.uid,
                                 child: ClipRRect(
                                   child: CachedNetworkImage(
-                                    imageUrl: _message.receiver.image,
+                                    imageUrl: otherUser.image,
                                     height: 60.0,
                                     width: 60.0,
                                   ),
@@ -192,11 +196,11 @@ class MessageScreen extends StatelessWidget {
                                       children: <Widget>[
                                         Expanded(
                                           child: Hero(
-                                            tag: _message.receiver.email,
+                                            tag: otherUser.email,
                                             child: Material(
                                               color: Colors.transparent,
                                               child: Text(
-                                                _message.receiver.name,
+                                                otherUser.name,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: GoogleFonts.raleway(
                                                   fontWeight: FontWeight.w800,

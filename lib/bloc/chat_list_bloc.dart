@@ -9,7 +9,7 @@ class ChatListBloc extends BaseBloc {
   createStream(User user) {
     stream = Firestore.instance
         .collection("messages")
-        .where("contributors", arrayContains: user.uid)
+        .where("contributors", arrayContains: user.uid).orderBy("time")
         .snapshots();
   }
 

@@ -29,6 +29,8 @@ dependencies:
   firebase_core:
   google_fonts:
   cached_network_image: ^2.0.0-rc
+  firebase_storage:
+  image_picker:
 
 dev_dependencies:
   flutter_test:

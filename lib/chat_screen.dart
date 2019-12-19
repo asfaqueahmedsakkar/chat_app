@@ -1,12 +1,15 @@
+import 'dart:math';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:caht_app/app_color.dart';
 import 'package:caht_app/bloc/app_bloc.dart';
 import 'package:caht_app/bloc/bloc_provider.dart';
 import 'package:caht_app/bloc/chat_bloc.dart';
-import 'package:caht_app/model/message.dart';
+import 'package:caht_app/model/chat_model.dart';
 import 'package:caht_app/model/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -105,22 +108,41 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             child: Column(
               children: <Widget>[
+                SizedBox(
+                  height: 8.0,
+                ),
                 Expanded(
                   child: StreamBuilder(
-                      stream: _chatBloc.stream,
+                      stream: Firestore.instance
+                          .collection("chat")
+                          .where("message_id", isEqualTo: _chatBloc.messageId)
+                          .orderBy("time", descending: true)
+                          .snapshots(),
                       builder:
                           (context, AsyncSnapshot<QuerySnapshot> snapshot) {
                         if (snapshot.data == null)
                           return Center(
                             child: CircularProgressIndicator(),
                           );
+                        User me = BlocProvider.of<AppBloc>(context).user;
                         return ListView.builder(
+                          physics: BouncingScrollPhysics(),
                           reverse: true,
                           itemCount: snapshot.data.documents.length,
                           itemBuilder: (context, index) {
-                            Message message = Message.fromData(
+                            ChatModel message = ChatModel.fromData(
                                 data: snapshot.data.documents[index]);
-                            return Text(message.message);
+                            return ChatBubble(
+                              message: message,
+                              fromMe: me.uid == message.sender.uid,
+                              replyThis: () {
+                                message.replyOf = null;
+                                setState(() {
+                                  BlocProvider.of<ChatBloc>(context).replyFor =
+                                      message;
+                                });
+                              },
+                            );
                           },
                         );
                       }),
@@ -130,81 +152,152 @@ class _ChatScreenState extends State<ChatScreen> {
                     vertical: 8.0,
                     horizontal: 16.0,
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Container(
-                        height: 40.0,
-                        width: 40.0,
-                        decoration: BoxDecoration(
-                          color: AppColor.deepBlack,
-                          borderRadius: BorderRadius.circular(18.0),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.add,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 4.0,
-                      ),
-                      Expanded(
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 4.0,
-                          ),
-                          constraints: BoxConstraints(
-                            maxHeight: 100.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColor.deepBlack,
-                            borderRadius: BorderRadius.circular(32.0),
-                          ),
-                          child: TextFormField(
-                            controller: _messageController,
-                            focusNode: focusNode,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            decoration: InputDecoration(
-                              contentPadding: EdgeInsets.all(4.0),
-                              border: InputBorder.none,
+                      _chatBloc.replyFor == null
+                          ? SizedBox()
+                          : Container(
+                              margin: EdgeInsets.only(bottom: 4.0),
+                              padding: EdgeInsets.all(12.0),
+                              color: AppColor.deepBlack,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: <Widget>[
+                                        RichText(
+                                          text: TextSpan(
+                                            text: "Reply of ",
+                                            style: TextStyle(fontSize: 12.0),
+                                            children: [
+                                              TextSpan(
+                                                text: _chatBloc
+                                                    .replyFor.sender.name,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          height: 4.0,
+                                        ),
+                                        Text(
+                                          _chatBloc.replyFor.message,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w200,
+                                          ),
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: 36.0,
+                                    child: GestureDetector(
+                                        child: Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                        ),
+                                        onTap: () {
+                                          setState(() {
+                                            _chatBloc.replyFor = null;
+                                          });
+                                        }),
+                                  ),
+                                ],
+                              ),
+                            ),
+                      Row(
+                        children: <Widget>[
+                          Container(
+                            height: 40.0,
+                            width: 40.0,
+                            decoration: BoxDecoration(
+                              color: AppColor.deepBlack,
+                              borderRadius: BorderRadius.circular(18.0),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.add,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 4.0,
-                      ),
-                      _hasMessage
-                          ? Container(
-                              height: 40.0,
-                              width: 40.0,
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                borderRadius: BorderRadius.circular(20.0),
+                          SizedBox(
+                            width: 4.0,
+                          ),
+                          Expanded(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 4.0,
                               ),
-                              child: RawMaterialButton(
-                                onPressed: () {
-                                  String _message = _messageController.text;
-                                  _messageController.clear();
-                                  FocusScope.of(context)
-                                      .requestFocus(FocusNode());
-                                  _chatBloc.sendMessage(messageText: _message);
-                                },
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20.0)),
-                                child: Center(
-                                  child: Icon(
-                                    Icons.send,
-                                    size: 20.0,
-                                    color: Colors.white,
-                                  ),
+                              constraints: BoxConstraints(
+                                maxHeight: 100.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColor.deepBlack,
+                                borderRadius: BorderRadius.circular(32.0),
+                              ),
+                              child: TextField(
+                                controller: _messageController,
+                                focusNode: focusNode,
+                                maxLines: null,
+                                style: GoogleFonts.actor(fontSize: 18),
+                                keyboardType: TextInputType.multiline,
+                                decoration: InputDecoration(
+                                  contentPadding: EdgeInsets.all(4.0),
+                                  border: InputBorder.none,
                                 ),
                               ),
-                            )
-                          : SizedBox(),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 4.0,
+                          ),
+                          _hasMessage
+                              ? Container(
+                                  height: 40.0,
+                                  width: 40.0,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    borderRadius: BorderRadius.circular(20.0),
+                                  ),
+                                  child: RawMaterialButton(
+                                    onPressed: () {
+                                      String _message = _messageController.text;
+                                      _messageController.clear();
+                                      FocusScope.of(context)
+                                          .requestFocus(FocusNode());
+                                      _chatBloc
+                                          .sendMessage(messageText: _message)
+                                          .then((s) {
+                                        setState(() {
+                                          _chatBloc.replyFor = null;
+                                        });
+                                      });
+                                    },
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(20.0)),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.send,
+                                        size: 20.0,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : SizedBox(),
+                        ],
+                      ),
                     ],
                   ),
                 )
@@ -212,6 +305,188 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class ChatBubble extends StatelessWidget {
+  final ChatModel message;
+  final bool fromMe;
+  final Function replyThis;
+
+  const ChatBubble({
+    Key key,
+    this.message,
+    this.fromMe,
+    this.replyThis,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      direction:
+          fromMe ? DismissDirection.endToStart : DismissDirection.startToEnd,
+      key: GlobalKey(),
+      confirmDismiss: (direction) async {
+        replyThis();
+        return false;
+      },
+      background: Container(
+        alignment: fromMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: EdgeInsets.only(
+            right: fromMe ? 16.0 : 0.0,
+            left: fromMe ? 0.0 : 16.0,
+          ),
+          padding: EdgeInsets.all(4.0),
+          decoration: BoxDecoration(
+            color: AppColor.deepBlack,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.reply,
+            color: Colors.white,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment:
+              fromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: <Widget>[
+            fromMe
+                ? SizedBox()
+                : ClipRRect(
+                    child: CachedNetworkImage(
+                      imageUrl: message.sender.image,
+                      height: 24.0,
+                      width: 24.0,
+                    ),
+                    borderRadius: BorderRadius.circular(18.0),
+                  ),
+            message.replyOf == null
+                ? bubbleWithNoReply()
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: fromMe
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          SizedBox(
+                            width: !fromMe ? 16.0 : 0.0,
+                          ),
+                          Transform(
+                            transform: Matrix4.identity()..rotateY(pi),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.reply,
+                              size: 16.0,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 4.0,
+                          ),
+                          Text(
+                            "${fromMe ? "You" : message.sender.name} replyed to ${(fromMe && message.replyOf.sender.uid == message.sender.uid) || (!fromMe && message.replyOf.sender.uid == message.receiver.uid) ? "You" : message.replyOf.sender.name}",
+                            style: TextStyle(
+                              fontSize: 10.0,
+                              fontWeight: FontWeight.w300,
+                            ),
+                          ),
+                          SizedBox(
+                            width: fromMe ? 16.0 : 0.0,
+                          ),
+                        ],
+                      ),
+                      Container(
+                        margin: EdgeInsets.symmetric(horizontal: 8.0),
+                        decoration: BoxDecoration(
+                          color: AppColor.deepBlack,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            bottomLeft: fromMe
+                                ? Radius.circular(20)
+                                : Radius.circular(0.0),
+                            topRight: Radius.circular(20),
+                            bottomRight: fromMe
+                                ? Radius.circular(0.0)
+                                : Radius.circular(20),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: fromMe
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  left: 12.0,
+                                  right: 12.0,
+                                  top: 4.0,
+                                  bottom: 2.0),
+                              child: Text(
+                                message.replyOf.message,
+                                style: GoogleFonts.actor(fontSize: 16),
+                              ),
+                            ),
+                            Row(
+                              children: <Widget>[
+                                SizedBox(
+                                  width: fromMe ? 16 : 0,
+                                ),
+                                bubbleWithNoReply(),
+                                SizedBox(
+                                  width: !fromMe ? 16 : 0,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+            !fromMe
+                ? SizedBox()
+                : ClipRRect(
+                    child: CachedNetworkImage(
+                      imageUrl: message.sender.image,
+                      height: 24.0,
+                      width: 24.0,
+                    ),
+                    borderRadius: BorderRadius.circular(18.0),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Container bubbleWithNoReply() {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8.0,
+      ),
+      decoration: BoxDecoration(
+        color: fromMe ? AppColor.transparentWhite : Colors.red,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          bottomLeft: fromMe ? Radius.circular(20) : Radius.circular(0.0),
+          topRight: Radius.circular(20),
+          bottomRight: fromMe ? Radius.circular(0.0) : Radius.circular(20),
+        ),
+      ),
+      child: Text(
+        message.message,
+        style: GoogleFonts.actor(fontSize: 18),
       ),
     );
   }

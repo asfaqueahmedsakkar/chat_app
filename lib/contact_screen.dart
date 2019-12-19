@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:caht_app/app_color.dart';
+import 'package:caht_app/bloc/app_bloc.dart';
 import 'package:caht_app/bloc/bloc_provider.dart';
 import 'package:caht_app/bloc/chat_list_bloc.dart';
 import 'package:caht_app/chat_screen.dart';
@@ -112,6 +113,10 @@ class ContactScreen extends StatelessWidget {
                           snapShot.data.documents[index];
                       User user =
                           User.fromDocument(data: documentSnapshot.data);
+
+                      if (user.uid ==
+                          BlocProvider.of<AppBloc>(context).user.uid)
+                        return SizedBox();
 
                       return RawMaterialButton(
                         onPressed: () {
