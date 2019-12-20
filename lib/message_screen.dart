@@ -222,7 +222,7 @@ class MessageScreen extends StatelessWidget {
                                       height: 4,
                                     ),
                                     Text(
-                                      _message.message,
+                                      _message.message??_message.mediaType,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.raleway(

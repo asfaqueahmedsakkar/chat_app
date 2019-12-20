@@ -18,12 +18,18 @@ class ChatBloc extends BaseBloc {
         : "${_receiver.uid}_${_sender.uid}";
   }
 
-  Future sendMessage({@required String messageText}) async {
+  Future sendMessage({
+    String messageText,
+    String media,
+    String mediaType,
+  }) async {
     ChatModel message = ChatModel.newMessage(
       sender: _sender,
       receiver: _receiver,
       message: messageText,
       messageId: messageId,
+      media: media,
+      mediaType: mediaType,
     );
 
     await Firestore.instance.collection("messages").document(messageId).setData(
@@ -33,7 +39,7 @@ class ChatBloc extends BaseBloc {
             }),
         );
     await Firestore.instance.collection("chat").add(
-          message.toJson()..putIfAbsent("replyof", () => replyFor.toJson()),
+          message.toJson()..putIfAbsent("replyof", () => replyFor?.toJson()),
         );
   }
 

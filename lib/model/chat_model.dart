@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 class ChatModel {
   User sender, receiver;
-  String message, messageId;
+  String message, messageId, media, mediaType;
   Timestamp messageTime;
   ChatModel replyOf;
 
@@ -17,12 +17,16 @@ class ChatModel {
     replyOf = data["replyof"] != null
         ? ChatModel.fromData(data: data["replyof"])
         : null;
+    media = data["media"];
+    mediaType = data["mediaType"];
   }
 
   ChatModel.newMessage({
     @required this.sender,
     @required this.receiver,
-    @required this.message,
+    this.message,
+    this.media,
+    this.mediaType,
     @required this.messageId,
   });
 
@@ -33,6 +37,8 @@ class ChatModel {
       "message": message,
       "time": FieldValue.serverTimestamp(),
       "message_id": messageId,
+      "media": media,
+      "mediaType": mediaType,
     };
   }
 }

@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:caht_app/app_color.dart';
@@ -8,9 +11,13 @@ import 'package:caht_app/bloc/chat_bloc.dart';
 import 'package:caht_app/model/chat_model.dart';
 import 'package:caht_app/model/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 
 class ChatScreen extends StatefulWidget {
   final User user;
@@ -27,12 +34,20 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hasMessage = false;
   ChatBloc _chatBloc;
 
+  User me;
+  bool uploadingImage = false;
+  double progress = 0;
+
+  File imageFile;
+  StorageUploadTask task;
+
   @override
   void initState() {
     _chatBloc = new ChatBloc(
       sender: BlocProvider.of<AppBloc>(context).user,
       receiver: widget.user,
     );
+    me = BlocProvider.of<AppBloc>(context).user;
     focusNode = new FocusNode();
     _messageController = new TextEditingController();
     _messageController.addListener(() {
@@ -111,200 +126,323 @@ class _ChatScreenState extends State<ChatScreen> {
                 SizedBox(
                   height: 8.0,
                 ),
-                Expanded(
-                  child: StreamBuilder(
-                      stream: Firestore.instance
-                          .collection("chat")
-                          .where("message_id", isEqualTo: _chatBloc.messageId)
-                          .orderBy("time", descending: true)
-                          .snapshots(),
-                      builder:
-                          (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-                        if (snapshot.data == null)
-                          return Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        User me = BlocProvider.of<AppBloc>(context).user;
-                        return ListView.builder(
-                          physics: BouncingScrollPhysics(),
-                          reverse: true,
-                          itemCount: snapshot.data.documents.length,
-                          itemBuilder: (context, index) {
-                            ChatModel message = ChatModel.fromData(
-                                data: snapshot.data.documents[index]);
-                            return ChatBubble(
-                              message: message,
-                              fromMe: me.uid == message.sender.uid,
-                              replyThis: () {
-                                message.replyOf = null;
-                                setState(() {
-                                  BlocProvider.of<ChatBloc>(context).replyFor =
-                                      message;
-                                });
-                              },
-                            );
-                          },
-                        );
-                      }),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 16.0,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      _chatBloc.replyFor == null
-                          ? SizedBox()
-                          : Container(
-                              margin: EdgeInsets.only(bottom: 4.0),
-                              padding: EdgeInsets.all(12.0),
-                              color: AppColor.deepBlack,
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                children: <Widget>[
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: <Widget>[
-                                        RichText(
-                                          text: TextSpan(
-                                            text: "Reply of ",
-                                            style: TextStyle(fontSize: 12.0),
-                                            children: [
-                                              TextSpan(
-                                                text: _chatBloc
-                                                    .replyFor.sender.name,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          height: 4.0,
-                                        ),
-                                        Text(
-                                          _chatBloc.replyFor.message,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w200,
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    height: 36.0,
-                                    child: GestureDetector(
-                                        child: Icon(
-                                          Icons.close,
-                                          color: Colors.white,
-                                        ),
-                                        onTap: () {
-                                          setState(() {
-                                            _chatBloc.replyFor = null;
-                                          });
-                                        }),
-                                  ),
-                                ],
-                              ),
-                            ),
-                      Row(
-                        children: <Widget>[
-                          Container(
-                            height: 40.0,
-                            width: 40.0,
-                            decoration: BoxDecoration(
-                              color: AppColor.deepBlack,
-                              borderRadius: BorderRadius.circular(18.0),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.add,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 4.0,
-                          ),
-                          Expanded(
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 4.0,
-                              ),
-                              constraints: BoxConstraints(
-                                maxHeight: 100.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColor.deepBlack,
-                                borderRadius: BorderRadius.circular(32.0),
-                              ),
-                              child: TextField(
-                                controller: _messageController,
-                                focusNode: focusNode,
-                                maxLines: null,
-                                style: GoogleFonts.actor(fontSize: 18),
-                                keyboardType: TextInputType.multiline,
-                                decoration: InputDecoration(
-                                  contentPadding: EdgeInsets.all(4.0),
-                                  border: InputBorder.none,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 4.0,
-                          ),
-                          _hasMessage
-                              ? Container(
-                                  height: 40.0,
-                                  width: 40.0,
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue,
-                                    borderRadius: BorderRadius.circular(20.0),
-                                  ),
-                                  child: RawMaterialButton(
-                                    onPressed: () {
-                                      String _message = _messageController.text;
-                                      _messageController.clear();
-                                      FocusScope.of(context)
-                                          .requestFocus(FocusNode());
-                                      _chatBloc
-                                          .sendMessage(messageText: _message)
-                                          .then((s) {
-                                        setState(() {
-                                          _chatBloc.replyFor = null;
-                                        });
-                                      });
-                                    },
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(20.0)),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.send,
-                                        size: 20.0,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : SizedBox(),
-                        ],
+                buildChatList(),
+                buildInputSection()
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildInputSection() {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        vertical: 8.0,
+        horizontal: 16.0,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _chatBloc.replyFor == null ? SizedBox() : buildReplyOfMessage(),
+          uploadingImage ? _imageUploadView() : SizedBox(),
+          Row(
+            children: <Widget>[
+              buildImageInputSection(),
+              buildHorizontalSeparator4(),
+              buildTextMessageInputSection(),
+              buildHorizontalSeparator4(),
+              _hasMessage ? buildSendButton() : SizedBox(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  SizedBox buildHorizontalSeparator4() {
+    return SizedBox(
+      width: 4.0,
+    );
+  }
+
+  Widget buildImageInputSection() {
+    return Container(
+      height: 40.0,
+      width: 40.0,
+      decoration: BoxDecoration(
+        color: AppColor.deepBlack,
+        borderRadius: BorderRadius.circular(20.0),
+      ),
+      child: RawMaterialButton(
+        onPressed: () async {
+          imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
+
+          _uploadImage(imageFile);
+        },
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.0),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.add,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Expanded buildTextMessageInputSection() {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: 4.0,
+        ),
+        constraints: BoxConstraints(
+          maxHeight: 100.0,
+        ),
+        decoration: BoxDecoration(
+          color: AppColor.deepBlack,
+          borderRadius: BorderRadius.circular(32.0),
+        ),
+        child: TextField(
+          controller: _messageController,
+          focusNode: focusNode,
+          maxLines: null,
+          style: GoogleFonts.actor(fontSize: 18),
+          keyboardType: TextInputType.multiline,
+          decoration: InputDecoration(
+            contentPadding: EdgeInsets.all(4.0),
+            border: InputBorder.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Container buildSendButton() {
+    return Container(
+      height: 40.0,
+      width: 40.0,
+      decoration: BoxDecoration(
+        color: Colors.blue,
+        borderRadius: BorderRadius.circular(20.0),
+      ),
+      child: RawMaterialButton(
+        onPressed: () {
+          String _message = _messageController.text;
+          _messageController.clear();
+          FocusScope.of(context).requestFocus(FocusNode());
+          _chatBloc.sendMessage(messageText: _message).then((s) {
+            if (_chatBloc.replyFor != null)
+              setState(() {
+                _chatBloc.replyFor = null;
+              });
+          });
+        },
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+        child: Center(
+          child: Icon(
+            Icons.send,
+            size: 20.0,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Container buildReplyOfMessage() {
+    return Container(
+      margin: EdgeInsets.only(bottom: 4.0),
+      padding: EdgeInsets.all(12.0),
+      color: AppColor.deepBlack,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                RichText(
+                  text: TextSpan(
+                    text: "Reply of ",
+                    style: TextStyle(fontSize: 12.0),
+                    children: [
+                      TextSpan(
+                        text: _chatBloc.replyFor.sender.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
+                  ),
+                ),
+                SizedBox(
+                  height: 4.0,
+                ),
+                Text(
+                  _chatBloc.replyFor.message,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w200,
                   ),
                 )
               ],
             ),
           ),
-        ),
+          SizedBox(
+            height: 36.0,
+            child: GestureDetector(
+                child: Icon(
+                  Icons.close,
+                  color: Colors.white,
+                ),
+                onTap: () {
+                  setState(() {
+                    _chatBloc.replyFor = null;
+                  });
+                }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Expanded buildChatList() {
+    return Expanded(
+      child: StreamBuilder(
+          stream: Firestore.instance
+              .collection("chat")
+              .where("message_id", isEqualTo: _chatBloc.messageId)
+              .orderBy("time", descending: true)
+              .snapshots(),
+          builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+            if (snapshot.data == null)
+              return Center(
+                child: CircularProgressIndicator(),
+              );
+            return ListView.builder(
+              physics: BouncingScrollPhysics(),
+              reverse: true,
+              itemCount: snapshot.data.documents.length,
+              itemBuilder: (context, index) {
+                ChatModel message =
+                    ChatModel.fromData(data: snapshot.data.documents[index]);
+                /*if (message.media != null) {
+                            //return Container(height: 120.0,width: 120.000,);
+                            return Text(message.mediaType);
+                          }*/
+                return ChatBubble(
+                  message: message,
+                  fromMe: me.uid == message.sender.uid,
+                  replyThis: () {
+                    message.replyOf = null;
+                    setState(() {
+                      BlocProvider.of<ChatBloc>(context).replyFor = message;
+                    });
+                  },
+                );
+              },
+            );
+          }),
+    );
+  }
+
+  void _uploadImage(File imageFile) async {
+    String fileName =
+        "${DateTime.now().millisecondsSinceEpoch.toString()}_${me.uid}";
+
+    if (imageFile.lengthSync() < 300 * 1025) {
+      task = FirebaseStorage.instance
+          .ref()
+          .child("$fileName${path.extension(imageFile.path)}")
+          .putData(imageFile.readAsBytesSync());
+    } else {
+      Uint8List list = Uint8List.fromList(
+          await FlutterImageCompress.compressWithFile(imageFile.absolute.path,
+              minWidth: 300, quality: 60));
+
+      task = FirebaseStorage.instance
+          .ref()
+          .child("$fileName${path.extension(imageFile.path)}")
+          .putData(list);
+    }
+
+    final StreamSubscription<StorageTaskEvent> streamSubscription =
+        task.events.listen((event) {
+      setState(() {
+        uploadingImage = true;
+        progress = event.snapshot.bytesTransferred.toDouble() /
+            event.snapshot.totalByteCount.toDouble();
+      });
+    });
+
+    await task.onComplete.then((task) {
+      task.ref.getDownloadURL().then((data) async {
+        await _chatBloc.sendMessage(
+          media: data,
+          mediaType: "image",
+        );
+
+        setState(() {
+          uploadingImage = false;
+        });
+      });
+    });
+    task = null;
+    imageFile=null;
+    streamSubscription.cancel();
+  }
+
+  _imageUploadView() {
+    return Container(
+      margin: EdgeInsets.only(bottom: 4.0),
+      padding: EdgeInsets.all(4.0),
+      color: AppColor.deepBlack,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Image.file(
+                  imageFile,
+                  height: 36.0,
+                  width: 36.0,
+                ),
+                SizedBox(
+                  width: 8.0,
+                ),
+                Text(
+                  "Uploading image",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w200,
+                  ),
+                )
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 36.0,
+            child: GestureDetector(
+                child: Icon(
+                  Icons.close,
+                  color: Colors.white,
+                ),
+                onTap: () {
+                  setState(() {
+                    uploadingImage = false;
+                  });
+                }),
+          ),
+        ],
       ),
     );
   }
@@ -324,66 +462,93 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      direction:
-          fromMe ? DismissDirection.endToStart : DismissDirection.startToEnd,
-      key: GlobalKey(),
-      confirmDismiss: (direction) async {
-        replyThis();
-        return false;
-      },
-      background: Container(
-        alignment: fromMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: EdgeInsets.only(
-            right: fromMe ? 16.0 : 0.0,
-            left: fromMe ? 0.0 : 16.0,
-          ),
-          padding: EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            color: AppColor.deepBlack,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.reply,
-            color: Colors.white,
-          ),
-        ),
+    return message.media == null
+        ? Dismissible(
+            direction: fromMe
+                ? DismissDirection.endToStart
+                : DismissDirection.startToEnd,
+            key: GlobalKey(),
+            confirmDismiss: (direction) async {
+              replyThis();
+              return false;
+            },
+            background: shareIconOnSwipe(),
+            child: chatMessageView(),
+          )
+        : chatMessageView();
+  }
+
+  Padding chatMessageView() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            fromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: <Widget>[
+          fromMe
+              ? SizedBox()
+              : ClipRRect(
+                  child: CachedNetworkImage(
+                    imageUrl: message.sender.image,
+                    height: 24.0,
+                    width: 24.0,
+                  ),
+                  borderRadius: BorderRadius.circular(18.0),
+                ),
+          message.media == null
+              ? message.replyOf == null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: bubbleWithNoReply(),
+                    )
+                  : buildBubbleForReply()
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: 300.0,
+                      maxHeight: 340.0,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8.0),
+                      child: CachedNetworkImage(
+                        imageUrl: message.media,
+                      ),
+                    ),
+                  ),
+                ),
+          !fromMe
+              ? SizedBox()
+              : ClipRRect(
+                  child: CachedNetworkImage(
+                    imageUrl: message.sender.image,
+                    height: 24.0,
+                    width: 24.0,
+                  ),
+                  borderRadius: BorderRadius.circular(18.0),
+                ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment:
-              fromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          children: <Widget>[
-            fromMe
-                ? SizedBox()
-                : ClipRRect(
-                    child: CachedNetworkImage(
-                      imageUrl: message.sender.image,
-                      height: 24.0,
-                      width: 24.0,
-                    ),
-                    borderRadius: BorderRadius.circular(18.0),
-                  ),
-            message.replyOf == null
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: bubbleWithNoReply(),
-                  )
-                : buildBubbleForReply(),
-            !fromMe
-                ? SizedBox()
-                : ClipRRect(
-                    child: CachedNetworkImage(
-                      imageUrl: message.sender.image,
-                      height: 24.0,
-                      width: 24.0,
-                    ),
-                    borderRadius: BorderRadius.circular(18.0),
-                  ),
-          ],
+    );
+  }
+
+  Container shareIconOnSwipe() {
+    return Container(
+      alignment: fromMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.only(
+          right: fromMe ? 16.0 : 0.0,
+          left: fromMe ? 0.0 : 16.0,
+        ),
+        padding: EdgeInsets.all(4.0),
+        decoration: BoxDecoration(
+          color: AppColor.deepBlack,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.reply,
+          color: Colors.white,
         ),
       ),
     );
